@@ -34,6 +34,8 @@ enum Commands {
     Restore {
         /// Snapshot ID; if omitted, you'll be prompted to pick one
         id: Option<String>,
+        #[arg(short, long)]
+        confirm: bool,
     },
 }
 
@@ -63,8 +65,8 @@ async fn main() {
                 tracing::error!(error = %e, "Failed to list snapshots")
             }
         }
-        Commands::Restore { id } => {
-            if let Err(e) = restore::run(&client, id).await {
+        Commands::Restore { id, confirm } => {
+            if let Err(e) = restore::run(&client, id, !confirm).await {
                 tracing::error!(error = %e, "Failed to restore snapshot")
             }
         }

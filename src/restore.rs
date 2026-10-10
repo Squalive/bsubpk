@@ -7,9 +7,20 @@ use aws_sdk_s3::Client;
 use std::path::Path;
 use tokio::{io::AsyncWriteExt, task::JoinSet};
 
-pub async fn run(client: &Client, id: Option<String>) -> anyhow::Result<()> {
+pub async fn run(client: &Client, id: Option<String>, needs_confirm: bool) -> anyhow::Result<()> {
     let snapshot_id = match id {
-        Some(id) => id,
+        Some(id) => {
+            if id == "latest" {
+                let mut snapshots = get_snapshots(client).await?;
+                if let Some(latest_id) = snapshots.pop() {
+                    latest_id
+                } else {
+                    anyhow::bail!("no snapshots found");
+                }
+            } else {
+                id
+            }
+        }
         None => {
             let snapshots = get_snapshots(client).await?;
             if snapshots.is_empty() {
@@ -22,10 +33,11 @@ pub async fn run(client: &Client, id: Option<String>) -> anyhow::Result<()> {
         }
     };
 
-    if !inquire::Confirm::new(&format!("Restore snapshot `{snapshot_id}`"))
-        .with_default(false)
-        .with_help_message("This will use your network to download from the cloudflare storage")
-        .prompt()?
+    if needs_confirm
+        && !inquire::Confirm::new(&format!("Restore snapshot `{snapshot_id}`"))
+            .with_default(false)
+            .with_help_message("This will use your network to download from the cloudflare storage")
+            .prompt()?
     {
         return Ok(());
     }
