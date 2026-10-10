@@ -46,20 +46,20 @@ jobs:
         shell: bash
         run: |
             cd target/${{ matrix.target }}/release
-            tar -czf ../../../bsubpk-${{ matrix.target }}.tar.gz bsubpk
+            tar -czf ../../../bsubp-${{ matrix.target }}.tar.gz bsubp
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
         shell: bash
         run: |
           cd target/${{ matrix.target }}/release
-          7z a ../../../bsubpk-${{ matrix.target }}.zip bsubpk.exe
+          7z a ../../../bsubp-${{ matrix.target }}.zip bsubp.exe
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bsubpk-${{ matrix.target }}
-          path: bsubpk-${{ matrix.target }}.*
+          name: bsubp-${{ matrix.target }}
+          path: bsubp-${{ matrix.target }}.*
 
   release:
     name: Create Release

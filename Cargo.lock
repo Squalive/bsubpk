@@ -625,8 +625,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "bsubkp"
-version = "0.1.0"
+name = "bsubp"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "aws-config",
