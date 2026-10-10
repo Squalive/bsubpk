@@ -4,7 +4,7 @@ use crate::{
     make_bar,
 };
 use aws_sdk_s3::Client;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tokio::{io::AsyncWriteExt, task::JoinSet};
 
 pub async fn run(client: &Client, id: Option<String>, needs_confirm: bool) -> anyhow::Result<()> {
@@ -72,22 +72,26 @@ async fn restore_snapshot(
         // Strip the snapshot prefix so files land at their original paths.
         let relative = key
             .strip_prefix(&prefix)
-            .ok_or_else(|| anyhow::anyhow!("key {key} does not start with prefix {prefix}"))?
-            .to_string();
+            .ok_or_else(|| anyhow::anyhow!("key {key} does not start with prefix {prefix}"))?;
+        let rel_path = safe_relative(relative)?;
 
-        let dest = dst_root.join(Path::new(&relative));
+        let label = rel_path.display().to_string();
+        let dest = dst_root.join(rel_path);
+
         let client = client.clone();
         let bar = bar.clone();
 
         joinset.spawn(async move {
             download_file(&client, &key, &dest).await?;
-            bar.set_message(relative.clone());
+            bar.set_message(label);
             bar.inc(1);
             Ok::<_, anyhow::Error>(())
         });
 
         while joinset.len() >= MAX_PARALLEL {
-            joinset.join_next().await;
+            if let Some(res) = joinset.join_next().await {
+                res??;
+            }
         }
     }
 
@@ -97,6 +101,21 @@ async fn restore_snapshot(
 
     bar.finish_with_message("restore complete");
     Ok(())
+}
+
+fn safe_relative(p: &str) -> anyhow::Result<PathBuf> {
+    let mut out = PathBuf::new();
+    for seg in p.replace('\\', "/").split('/') {
+        match seg {
+            "" | "." => continue,
+            ".." => anyhow::bail!("refusing path traversal in key: {p}"),
+            s => out.push(s),
+        }
+    }
+    if out.as_os_str().is_empty() {
+        anyhow::bail!("key resolves to empty path: {p}");
+    }
+    Ok(out)
 }
 
 /// Stream a single object from R2 to a local path.
